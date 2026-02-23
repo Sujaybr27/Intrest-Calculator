@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interest Calculator</title>
+
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f2f2f7;
+    padding: 20px;
+    margin: 0;
+}
+
+.container {
+    max-width: 420px;
+    margin: auto;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.card {
+    background: white;
+    padding: 18px;
+    border-radius: 16px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+label {
+    font-weight: 500;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.input-field {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+button {
+    width: 100%;
+    padding: 14px;
+    font-size: 18px;
+    border-radius: 14px;
+    border: none;
+    margin-top: 12px;
+}
+
+.calculate {
+    background: #007aff;
+    color: white;
+}
+
+.reset {
+    background: #ff3b30;
+    color: white;
+}
+
+.result-line {
+    margin-bottom: 8px;
+}
+
+.total {
+    font-size: 24px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Interest Calculator</h1>
+
+<div class="card">
+    <label>Principal (₹)</label>
+    <input type="number" id="principal" class="input-field">
+</div>
+
+<div class="card">
+    <label>Pledged Date</label>
+    <input type="date" id="pledgeDate" class="input-field">
+</div>
+
+<div class="card">
+    <div class="toggle-row">
+        <label for="customRateToggle">Use Custom Rate (%)</label>
+        <input type="checkbox" id="customRateToggle">
+    </div>
+    <input type="number" step="0.01" id="customRate" class="input-field" disabled>
+</div>
+
+<div class="card">
+    <div class="toggle-row">
+        <label for="compoundToggle">Compound Interest</label>
+        <input type="checkbox" id="compoundToggle">
+    </div>
+    <input type="number" id="compoundMonths" class="input-field" placeholder="Compound every N months" disabled>
+</div>
+
+<button class="calculate" onclick="calculate()">Calculate</button>
+<button class="reset" onclick="resetAll()">Reset</button>
+
+<div class="card" id="output" style="display:none;">
+    <div class="result-line" id="months"></div>
+    <div class="result-line" id="rate"></div>
+    <div class="result-line" id="perMonth"></div>
+    <div class="result-line" id="interest"></div>
+    <div class="total" id="total"></div>
+</div>
+
+</div>
+
+<script>
+
+// Enable / Disable fields
+document.getElementById("customRateToggle").addEventListener("change", function() {
+    document.getElementById("customRate").disabled = !this.checked;
+});
+
+document.getElementById("compoundToggle").addEventListener("change", function() {
+    document.getElementById("compoundMonths").disabled = !this.checked;
+});
+
+function calculate() {
+
+    let principal = parseFloat(document.getElementById("principal").value);
+    let pledgeDateValue = document.getElementById("pledgeDate").value;
+
+    if (!principal || !pledgeDateValue) {
+        alert("Please enter Principal and Pledged Date");
+        return;
+    }
+
+    // iOS SAFE DATE PARSING
+    let parts = pledgeDateValue.split("-");
+    let pledgeDate = new Date(parts[0], parts[1] - 1, parts[2]);
+
+    let today = new Date();
+
+    // FIRST MONTH FREE
+    let freeEnd = new Date(pledgeDate);
+    freeEnd.setMonth(freeEnd.getMonth() + 1);
+
+    let interestMonths = 0;
+
+    if (today > freeEnd) {
+
+        interestMonths =
+            (today.getFullYear() - freeEnd.getFullYear()) * 12 +
+            (today.getMonth() - freeEnd.getMonth());
+
+        // If current day passed billing day → count next month
+        if (today.getDate() > freeEnd.getDate()) {
+            interestMonths += 1;
+        }
+    }
+
+    if (interestMonths < 0) interestMonths = 0;
+
+    let totalMonths = interestMonths + 1;
+
+    // RATE LOGIC
+    let rate;
+
+    if (document.getElementById("customRateToggle").checked) {
+
+        let customRateValue = parseFloat(document.getElementById("customRate").value);
+        if (!customRateValue) {
+            alert("Enter custom rate");
+            return;
+        }
+
+        rate = customRateValue / 100;
+
+    } else {
+
+        if (principal <= 5000) rate = 0.03;
+        else if (principal <= 10000) rate = 0.025;
+        else rate = 0.02;
+    }
+
+    let perMonthInterest = principal * rate;
+    let total = principal;
+
+    // COMPOUND LOGIC
+    if (document.getElementById("compoundToggle").checked) {
+
+        let every = parseInt(document.getElementById("compoundMonths").value);
+
+        if (!every || every <= 0) {
+            alert("Enter valid compound months");
+            return;
+        }
+
+        let cycles = Math.floor(interestMonths / every);
+        let remainder = interestMonths % every;
+
+        for (let i = 0; i < cycles; i++) {
+            total = total * Math.pow(1 + rate, every);
+        }
+
+        total = total + (total * rate * remainder);
+
+    } else {
+        total = principal + (principal * rate * interestMonths);
+    }
+
+    let interest = total - principal;
+
+    document.getElementById("months").innerHTML =
+        "Interest Months: " + interestMonths +
+        " | Total Months: " + totalMonths;
+
+    document.getElementById("rate").innerHTML =
+        "Applied Rate: " + (rate * 100).toFixed(2) + "%";
+
+    document.getElementById("perMonth").innerHTML =
+        "Interest Per Month: ₹" + formatIndian(perMonthInterest);
+
+    document.getElementById("interest").innerHTML =
+        "Total Interest: ₹" + formatIndian(interest);
+
+    document.getElementById("total").innerHTML =
+        "Final Amount: ₹" + formatIndian(total);
+
+    document.getElementById("output").style.display = "block";
+}
+
+function resetAll() {
+    document.getElementById("principal").value = "";
+    document.getElementById("pledgeDate").value = "";
+    document.getElementById("customRate").value = "";
+    document.getElementById("compoundMonths").value = "";
+    document.getElementById("customRateToggle").checked = false;
+    document.getElementById("compoundToggle").checked = false;
+    document.getElementById("customRate").disabled = true;
+    document.getElementById("compoundMonths").disabled = true;
+    document.getElementById("output").style.display = "none";
+}
+
+function formatIndian(num) {
+    return num.toLocaleString('en-IN', {maximumFractionDigits:0});
+}
+
+</script>
+
+</body>
+</html>

@@ -53,6 +53,26 @@ label {
     margin-bottom: 10px;
 }
 
+.mode-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: none;
+    background: #e5e5ea;
+    cursor: pointer;
+}
+
+.mode-btn.active {
+    background: #007aff;
+    color: white;
+}
+
 button {
     width: 100%;
     padding: 14px;
@@ -62,25 +82,11 @@ button {
     margin-top: 12px;
 }
 
-.calculate {
-    background: #007aff;
-    color: white;
-}
+.calculate { background: #007aff; color: white; }
+.reset { background: #ff3b30; color: white; }
 
-.reset {
-    background: #ff3b30;
-    color: white;
-}
-
-.result-line {
-    margin-bottom: 8px;
-}
-
-.total {
-    font-size: 24px;
-    font-weight: bold;
-    margin-top: 10px;
-}
+.result-line { margin-bottom: 8px; }
+.total { font-size: 24px; font-weight: bold; margin-top: 10px; }
 </style>
 </head>
 
@@ -90,27 +96,39 @@ button {
 
 <h1>Interest Calculator</h1>
 
+<!-- Principal -->
 <div class="card">
     <label>Principal (₹)</label>
-    <input type="number" id="principal" class="input-field">
+    <input type="text" id="principal" class="input-field">
+    <div id="amountWords" style="margin-top:6px;font-size:14px;color:#555;"></div>
 </div>
 
+<!-- Date -->
 <div class="card">
     <label>Pledged Date</label>
-    <input type="date" id="pledgeDate" class="input-field">
+
+    <div class="mode-row">
+        <button type="button" id="manualBtn" class="mode-btn active">Manual</button>
+        <button type="button" id="calendarBtn" class="mode-btn">Calendar</button>
+    </div>
+
+    <input type="text" id="manualDate" class="input-field" placeholder="DD/MM/YYYY">
+    <input type="date" id="pledgeDate" class="input-field" style="display:none;">
 </div>
 
+<!-- Custom Rate -->
 <div class="card">
     <div class="toggle-row">
-        <label for="customRateToggle">Use Custom Rate (%)</label>
+        <label>Use Custom Rate (%)</label>
         <input type="checkbox" id="customRateToggle">
     </div>
     <input type="number" step="0.01" id="customRate" class="input-field" disabled>
 </div>
 
+<!-- Compound -->
 <div class="card">
     <div class="toggle-row">
-        <label for="compoundToggle">Compound Interest</label>
+        <label>Compound Interest</label>
         <input type="checkbox" id="compoundToggle">
     </div>
     <input type="number" id="compoundMonths" class="input-field" placeholder="Compound every N months" disabled>
@@ -121,144 +139,197 @@ button {
 
 <div class="card" id="output" style="display:none;">
     <div class="result-line" id="months"></div>
-    <div class="result-line" id="rate"></div>
+    <div class="result-line" id="rateLine"></div>
     <div class="result-line" id="perMonth"></div>
-    <div class="result-line" id="interest"></div>
-    <div class="total" id="total"></div>
+    <div class="result-line" id="interestLine"></div>
+    <div class="total" id="totalLine"></div>
 </div>
 
 </div>
 
 <script>
 
-// Enable / Disable fields
-document.getElementById("customRateToggle").addEventListener("change", function() {
-    document.getElementById("customRate").disabled = !this.checked;
+let dateMode = "manual";
+
+// Mode toggle
+manualBtn.onclick = () => {
+    dateMode = "manual";
+    manualBtn.classList.add("active");
+    calendarBtn.classList.remove("active");
+    manualDate.style.display = "block";
+    pledgeDate.style.display = "none";
+};
+
+calendarBtn.onclick = () => {
+    dateMode = "calendar";
+    calendarBtn.classList.add("active");
+    manualBtn.classList.remove("active");
+    manualDate.style.display = "none";
+    pledgeDate.style.display = "block";
+};
+
+// Enable/Disable fields
+customRateToggle.onchange = () =>
+    customRate.disabled = !customRateToggle.checked;
+
+compoundToggle.onchange = () =>
+    compoundMonths.disabled = !compoundToggle.checked;
+
+// Principal formatting
+principal.addEventListener("input", function () {
+    let raw = this.value.replace(/,/g, '').replace(/\D/g, '');
+    if (!raw) { amountWords.innerHTML = ""; return; }
+    this.value = Number(raw).toLocaleString('en-IN');
+    amountWords.innerHTML = convertToWords(Number(raw)) + " only";
 });
 
-document.getElementById("compoundToggle").addEventListener("change", function() {
-    document.getElementById("compoundMonths").disabled = !this.checked;
+// Manual date auto format
+manualDate.addEventListener("input", function () {
+    let digits = this.value.replace(/\D/g, '');
+    let result = "";
+    for (let i = 0; i < digits.length && i < 8; i++) {
+        if (i === 2 || i === 4) result += "/";
+        result += digits[i];
+    }
+    this.value = result;
 });
 
+function parseManualDate(text) {
+    let p = text.split("/");
+    if (p.length !== 3) return null;
+    return new Date(p[2], p[1] - 1, p[0]);
+}
+
+function convertToWords(num) {
+    if (num === 0) return "Zero Rupees";
+    const a=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine",
+    "Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen",
+    "Seventeen","Eighteen","Nineteen"];
+    const b=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+    function two(n){ return n<20?a[n]:b[Math.floor(n/10)]+" "+a[n%10]; }
+    function three(n){ return n<100?two(n):
+    a[Math.floor(n/100)]+" Hundred "+(n%100?two(n%100):""); }
+
+    let crore=Math.floor(num/10000000); num%=10000000;
+    let lakh=Math.floor(num/100000); num%=100000;
+    let thousand=Math.floor(num/1000); num%=1000;
+
+    let str="";
+    if(crore) str+=three(crore)+" Crore ";
+    if(lakh) str+=three(lakh)+" Lakh ";
+    if(thousand) str+=three(thousand)+" Thousand ";
+    if(num) str+=three(num);
+
+    return str.trim()+" Rupees";
+}
+
+// ORIGINAL CALCULATION LOGIC PRESERVED
 function calculate() {
 
-    let principal = parseFloat(document.getElementById("principal").value);
-    let pledgeDateValue = document.getElementById("pledgeDate").value;
+let principalAmount=parseFloat(principal.value.replace(/,/g,''));
+if(!principalAmount){ alert("Enter Principal"); return; }
 
-    if (!principal || !pledgeDateValue) {
-        alert("Please enter Principal and Pledged Date");
-        return;
-    }
+let pledgeDateObj;
 
-    // iOS SAFE DATE PARSING
-    let parts = pledgeDateValue.split("-");
-    let pledgeDate = new Date(parts[0], parts[1] - 1, parts[2]);
-
-    let today = new Date();
-
-    // FIRST MONTH FREE
-    let freeEnd = new Date(pledgeDate);
-    freeEnd.setMonth(freeEnd.getMonth() + 1);
-
-    let interestMonths = 0;
-
-    if (today > freeEnd) {
-
-        interestMonths =
-            (today.getFullYear() - freeEnd.getFullYear()) * 12 +
-            (today.getMonth() - freeEnd.getMonth());
-
-        // If current day passed billing day → count next month
-        if (today.getDate() > freeEnd.getDate()) {
-            interestMonths += 1;
-        }
-    }
-
-    if (interestMonths < 0) interestMonths = 0;
-
-    let totalMonths = interestMonths + 1;
-
-    // RATE LOGIC
-    let rate;
-
-    if (document.getElementById("customRateToggle").checked) {
-
-        let customRateValue = parseFloat(document.getElementById("customRate").value);
-        if (!customRateValue) {
-            alert("Enter custom rate");
-            return;
-        }
-
-        rate = customRateValue / 100;
-
-    } else {
-
-        if (principal < 5000) rate = 0.03;
-        else if (principal < 10000) rate = 0.025;
-        else rate = 0.02;
-    }
-
-    let perMonthInterest = principal * rate;
-    let total = principal;
-
-    // COMPOUND LOGIC
-    if (document.getElementById("compoundToggle").checked) {
-
-        let every = parseInt(document.getElementById("compoundMonths").value);
-
-        if (!every || every <= 0) {
-            alert("Enter valid compound months");
-            return;
-        }
-
-        let cycles = Math.floor(interestMonths / every);
-        let remainder = interestMonths % every;
-
-        for (let i = 0; i < cycles; i++) {
-            total = total * Math.pow(1 + rate, every);
-        }
-
-        total = total + (total * rate * remainder);
-
-    } else {
-        total = principal + (principal * rate * interestMonths);
-    }
-
-    let interest = total - principal;
-
-    document.getElementById("months").innerHTML =
-        "Interest Months: " + interestMonths +
-        " | Total Months: " + totalMonths;
-
-    document.getElementById("rate").innerHTML =
-        "Applied Rate: " + (rate * 100).toFixed(2) + "%";
-
-    document.getElementById("perMonth").innerHTML =
-        "Interest Per Month: ₹" + formatIndian(perMonthInterest);
-
-    document.getElementById("interest").innerHTML =
-        "Total Interest: ₹" + formatIndian(interest);
-
-    document.getElementById("total").innerHTML =
-        "Final Amount: ₹" + formatIndian(total);
-
-    document.getElementById("output").style.display = "block";
+if(dateMode==="manual"){
+    pledgeDateObj=parseManualDate(manualDate.value);
+}else{
+    if(!pledgeDate.value){ alert("Select Date"); return; }
+    let p=pledgeDate.value.split("-");
+    pledgeDateObj=new Date(p[0],p[1]-1,p[2]);
 }
 
-function resetAll() {
-    document.getElementById("principal").value = "";
-    document.getElementById("pledgeDate").value = "";
-    document.getElementById("customRate").value = "";
-    document.getElementById("compoundMonths").value = "";
-    document.getElementById("customRateToggle").checked = false;
-    document.getElementById("compoundToggle").checked = false;
-    document.getElementById("customRate").disabled = true;
-    document.getElementById("compoundMonths").disabled = true;
-    document.getElementById("output").style.display = "none";
+if(!pledgeDateObj || isNaN(pledgeDateObj)){ alert("Invalid Date"); return; }
+
+let today=new Date();
+
+let freeEnd=new Date(pledgeDateObj);
+freeEnd.setMonth(freeEnd.getMonth()+1);
+
+let interestMonths=0;
+
+if(today>freeEnd){
+    interestMonths=
+        (today.getFullYear()-freeEnd.getFullYear())*12+
+        (today.getMonth()-freeEnd.getMonth());
+
+    if(today.getDate()>freeEnd.getDate()){
+        interestMonths+=1;
+    }
 }
 
-function formatIndian(num) {
-    return num.toLocaleString('en-IN', {maximumFractionDigits:0});
+if(interestMonths<0) interestMonths=0;
+
+let totalMonths=interestMonths+1;
+
+let base=new Date(pledgeDateObj);
+base.setMonth(base.getMonth()+(totalMonths-1));
+let extraDays=Math.floor((today-base)/(1000*60*60*24));
+
+let rate;
+
+if(customRateToggle.checked){
+    let r=parseFloat(customRate.value);
+    if(!r){ alert("Enter custom rate"); return; }
+    rate=r/100;
+}else{
+    if(principalAmount<5000) rate=0.03;
+    else if(principalAmount<10000) rate=0.025;
+    else rate=0.02;
+}
+
+let perMonthInterest=principalAmount*rate;
+let total=principalAmount;
+
+if(compoundToggle.checked){
+    let every=parseInt(compoundMonths.value);
+    if(!every||every<=0){ alert("Enter valid compound months"); return; }
+
+    let cycles=Math.floor(interestMonths/every);
+    let remainder=interestMonths%every;
+
+    for(let i=0;i<cycles;i++){
+        total=total*Math.pow(1+rate,every);
+    }
+    total=total+(total*rate*remainder);
+}else{
+    total=principalAmount+(principalAmount*rate*interestMonths);
+}
+
+let totalInterest=total-principalAmount;
+
+months.innerHTML =
+"Interest Months: " + interestMonths +
+" | Total Months: " + totalMonths +
+" (" + extraDays + " days)";
+
+rateLine.innerHTML =
+"Applied Rate: " + (rate*100).toFixed(2) + "%";
+
+perMonth.innerHTML =
+"Interest Per Month: ₹" + perMonthInterest.toLocaleString('en-IN');
+
+interestLine.innerHTML =
+"Total Interest: ₹" + totalInterest.toLocaleString('en-IN');
+
+totalLine.innerHTML =
+"Final Amount: ₹" + total.toLocaleString('en-IN');
+
+output.style.display="block";
+}
+
+function resetAll(){
+principal.value="";
+manualDate.value="";
+pledgeDate.value="";
+customRate.value="";
+compoundMonths.value="";
+customRateToggle.checked=false;
+compoundToggle.checked=false;
+customRate.disabled=true;
+compoundMonths.disabled=true;
+amountWords.innerHTML="";
+output.style.display="none";
 }
 
 </script>
